@@ -1,10 +1,12 @@
 (ns clync.core
   (:use [clync.cprint :only [cprint]])
-  (:require [clojure.string :as str])
+  (:require [clojure.string :as str]
+            [clojure.pprint :as pp])
   (:import [System.IO Directory FileStream FileMode IOException]
            [System.Security.Cryptography SHA1CryptoServiceProvider]))
 
 (def root-path (atom nil))
+(def ignore-list (atom []))
 
 (defrecord File [hash full-path relative-path short-path])
 (defrecord Dir [full-path relative-path short-path files])
@@ -44,33 +46,52 @@
     (catch IOException e
       (println "WARN:" (. e Message)))))
 
+(defn filter-ignores [paths ignore-list]
+  (filter 
+   (fn [{:keys [relative-path full-path short-path]}]
+     (not (some (fn [ignore-path]
+                  (= relative-path ignore-path))
+                ignore-list)))
+   paths))
+
 (defn process-dir [path]
-  (println @root-path)
   (let [root-path @root-path
-        dirs (Directory/GetDirectories path)
+        dirs (Directory/GetDirectories path) 
         files (Directory/GetFiles path)]
-    (concat
-     (for [d dirs]
-       {:full-path d :relative-path (get-relative-path root-path d)
-        :short-path (get-short-path d)})
-     (for [f files]
-       (File. (sha1-hash f) f (get-relative-path root-path f)
-              (get-short-path f))))))
+    (-> (concat
+         (for [d dirs]
+           {:full-path d :relative-path (get-relative-path root-path d)
+            :short-path (get-short-path d)})
+         (for [f files]
+           (File. (sha1-hash f) f (get-relative-path root-path f)
+                  (get-short-path f))))
+        (filter-ignores @ignore-list))))
 
 (defn process-tree [path]
   (let [contents (process-dir path)
         tree (map #(condp = (type %)
-                        File [(:short-path %) %]
-                        [(:short-path %) (Dir* % (process-tree (:full-path %)))])
+                     File [(keyword (:short-path %)) %]
+                     [(keyword (:short-path %))
+                      (Dir* % (->> (process-tree (:full-path %))
+                                   (vec)
+                                   (into {})))])
                      contents)]
-    tree))
+    (into {} tree)))
 
 (defn build-tree [path]
   (reset! root-path path)
   (process-tree path))
 
 (defn test-tree []
-  (build-tree "C:\\mski\\dev\\clync"))
+  (reset! ignore-list [".git"
+                       "bin"
+                       "src\\clojure.console\\obj"
+                       "src\\clync\\obj"])
+  (build-tree "C:\\dev\\clync"))
+
+(defn test-website []
+  (reset! ignore-list [])
+  (pp/pprint (build-tree "C:\\dev\\TotalPro\\Dev\\TotalPro_Designer")))
 
 
 ;; TODO change records to have only full-path, use Protocols for
