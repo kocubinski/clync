@@ -8,13 +8,15 @@
 (def root-path (atom nil))
 (def ignore-list (atom []))
 
-(defrecord File [hash full-path relative-path short-path])
-(defrecord Dir [full-path relative-path short-path files])
+(defprotocol INode)
 
-(defn Dir* [{:keys [full-path relative-path short-path]} files]
-  (Dir. full-path relative-path short-path files))
+(defrecord File [hash full-path root-path]
+  INode)
 
-(defn get-relative-path [root-path full-path]
+(defrecord Dir [full-path root-path children]
+  INode)
+
+(defn relative-path [^INode {:keys [full-path root-path]}]
   (let [matcher (re-matcher
                  (re-pattern (str "(" (str/replace root-path "\\" "\\\\") ")(.*)$" ))
                  full-path)
@@ -29,8 +31,11 @@
                    rel-path)]
     rel-path))
 
-(defn get-short-path [full-path]
+(defn short-path [^INode {:keys [full-path]}]
   (last (str/split full-path #"\\")))
+
+(defn get-keyword [node]
+  (keyword (short-path node)))
 
 (defn hash->string [hash]
   (let [str-hash (StringBuilder. (* 2 (. hash Length)))]
@@ -46,13 +51,13 @@
     (catch IOException e
       (println "WARN:" (. e Message)))))
 
-(defn filter-ignores [paths ignore-list]
+(defn filter-ignores [inodes ignore-list]
   (filter 
-   (fn [{:keys [relative-path full-path short-path]}]
+   (fn [inode]
      (not (some (fn [ignore-path]
-                  (= relative-path ignore-path))
+                  (= (relative-path inode) ignore-path))
                 ignore-list)))
-   paths))
+   inodes))
 
 (defn process-dir [path]
   (let [root-path @root-path
@@ -60,21 +65,22 @@
         files (Directory/GetFiles path)]
     (-> (concat
          (for [d dirs]
-           {:full-path d :relative-path (get-relative-path root-path d)
-            :short-path (get-short-path d)})
+           (Dir. d root-path nil))
          (for [f files]
-           (File. (sha1-hash f) f (get-relative-path root-path f)
-                  (get-short-path f))))
+           (File. (sha1-hash f) f root-path)))
         (filter-ignores @ignore-list))))
 
 (defn process-tree [path]
   (let [contents (process-dir path)
-        tree (map #(condp = (type %)
-                     File [(keyword (:short-path %)) %]
-                     [(keyword (:short-path %))
-                      (Dir* % (->> (process-tree (:full-path %))
-                                   (vec)
-                                   (into {})))])
+        tree (map #(let [{:keys [full-path root-path]} %
+                         short-path (short-path %)]
+                     (condp = (type %)
+                       File [(keyword short-path) %]
+                       Dir [(keyword short-path)
+                            (Dir. full-path root-path
+                                  (->> (process-tree full-path)
+                                       (vec)
+                                       (into {})))]))
                      contents)]
     (into {} tree)))
 
@@ -82,20 +88,40 @@
   (reset! root-path path)
   (process-tree path))
 
+(defn compare-file [file dir-other]
+  (println (get-keyword file))
+  (let [file-key (get-keyword file)
+        file-other (-> dir-other :children file-key)]
+    {:full-path (:full-path file)
+     :in-other? (nil? file-other)
+     :equal? (= (:hash file) (:hash file-other))}))
+
+(defn compare-dir [^Dir dir-base ^Dir dir-other]
+  ;(println (:full-path dir-base) "and" (:full-path dir-other))
+  (doseq [[node-key node] (:children dir-base)]
+    (println node-key node)
+    (condp = (type node)
+      File (println (compare-file node dir-other)) 
+      Dir (compare-dir node (-> dir-other :children node-key)))))
+
+(defn compare-trees [path-base path-other]
+  (reset! ignore-list [".git"
+                       "bin"
+                       "src\\clojure.console\\obj"
+                       "src\\clync\\obj"])
+  (let [tree-base (build-tree path-base)
+        tree-other (build-tree path-other)]
+    (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
+      (compare-dir dir (dir-key tree-other)))))
+
 (defn test-tree []
   (reset! ignore-list [".git"
                        "bin"
                        "src\\clojure.console\\obj"
                        "src\\clync\\obj"])
-  (build-tree "C:\\dev\\clync"))
+  (pp/pprint 
+   (build-tree "C:\\dev\\clync")))
 
 (defn test-website []
   (reset! ignore-list [])
   (pp/pprint (build-tree "C:\\dev\\TotalPro\\Dev\\TotalPro_Designer")))
-
-
-;; TODO change records to have only full-path, use Protocols for
-;; methods to retreieve relative-path and short-path from full-path
-;; when needed.  this will reduce serializing/deserializng time.
-
-;; 
