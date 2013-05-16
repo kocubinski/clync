@@ -88,20 +88,34 @@
   (reset! root-path path)
   (process-tree path))
 
+(defn write-tree-state [tree-path & {:keys [config-path]}]
+  (let [config-path (or config-path (str tree-path "\\.clync-tree.clj"))]
+    (reset! ignore-list [".git"
+                         "bin"
+                         "src\\clojure.console\\obj"
+                         "src\\clync\\obj"])
+    (spit config-path (build-tree tree-path))))
+
+(defn read-tree-state [config-path]
+  (read-string (slurp config-path)))
+
+(def ^:dynamic *compare-results*)
+
+(defn print-results [compare-results]
+  (pp/pprint (filter #(or (not (:in-other? %)) (not (:equal? %)))
+                     compare-results)))
+
 (defn compare-file [file dir-other]
-  (println (get-keyword file))
   (let [file-key (get-keyword file)
         file-other (-> dir-other :children file-key)]
     {:full-path (:full-path file)
-     :in-other? (nil? file-other)
+     :in-other? (not (nil? file-other))
      :equal? (= (:hash file) (:hash file-other))}))
 
 (defn compare-dir [^Dir dir-base ^Dir dir-other]
-  ;(println (:full-path dir-base) "and" (:full-path dir-other))
   (doseq [[node-key node] (:children dir-base)]
-    (println node-key node)
     (condp = (type node)
-      File (println (compare-file node dir-other)) 
+      File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
       Dir (compare-dir node (-> dir-other :children node-key)))))
 
 (defn compare-trees [path-base path-other]
@@ -109,10 +123,12 @@
                        "bin"
                        "src\\clojure.console\\obj"
                        "src\\clync\\obj"])
-  (let [tree-base (build-tree path-base)
-        tree-other (build-tree path-other)]
-    (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
-      (compare-dir dir (dir-key tree-other)))))
+  (binding [*compare-results* []]
+    (let [tree-base (build-tree path-base)
+          tree-other (build-tree path-other)]
+      (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
+        (compare-dir dir (dir-key tree-other))))
+    (print-results *compare-results*)))
 
 (defn test-tree []
   (reset! ignore-list [".git"

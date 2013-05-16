@@ -9,8 +9,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>clync</RootNamespace>
     <AssemblyName>clync</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -43,6 +44,13 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="core.clj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="cprint.clj" />
+    <EmbeddedResource Include="init.clj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="cli.clj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

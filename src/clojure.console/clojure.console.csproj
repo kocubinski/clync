@@ -55,11 +55,13 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Clojure">
-      <HintPath>..\..\packages\Clojure.1.4.0.5\lib\net40\Clojure.dll</HintPath>
+    <Reference Include="Clojure, Version=1.4.0.0, Culture=neutral, PublicKeyToken=cf3caecd327a2fa9, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Clojure.dll</HintPath>
     </Reference>
-    <Reference Include="ClojureClrEx">
-      <HintPath>..\..\packages\ClojureClrEx.0.1.2\lib\net40\ClojureClrEx.dll</HintPath>
+    <Reference Include="ClojureClrEx, Version=0.1.1.0, Culture=neutral, PublicKeyToken=cf3caecd327a2fa9, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\ClojureClrEx.dll</HintPath>
     </Reference>
     <Reference Include="clync">
       <HintPath>..\clync\bin\Debug\clync.dll</HintPath>
@@ -94,6 +96,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Clojure.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
