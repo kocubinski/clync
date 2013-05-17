@@ -1,7 +1,8 @@
 (ns clync.core
   (:use [clync.cprint :only [cprint]])
   (:require [clojure.string :as str]
-            [clojure.pprint :as pp])
+            [clojure.pprint :as pp]
+            [clync.remote :as remote])
   (:import [System.IO Directory FileStream FileMode IOException]
            [System.Security.Cryptography SHA1CryptoServiceProvider]))
 
@@ -86,14 +87,14 @@
 
 (defn build-tree [path]
   (reset! root-path path)
+  (reset! ignore-list [".git"
+                       "bin"
+                       "src\\clojure.console\\obj"
+                       "src\\clync\\obj"]) 
   (process-tree path))
 
 (defn write-tree-state [tree-path & {:keys [config-path]}]
   (let [config-path (or config-path (str tree-path "\\.clync-tree.clj"))]
-    (reset! ignore-list [".git"
-                         "bin"
-                         "src\\clojure.console\\obj"
-                         "src\\clync\\obj"])
     (spit config-path (build-tree tree-path))))
 
 (defn read-tree-state [config-path]
@@ -118,23 +119,18 @@
       File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
       Dir (compare-dir node (-> dir-other :children node-key)))))
 
-(defn compare-trees [path-base path-other]
-  (reset! ignore-list [".git"
-                       "bin"
-                       "src\\clojure.console\\obj"
-                       "src\\clync\\obj"])
+(defn compare-trees [tree-base tree-other]
   (binding [*compare-results* []]
-    (let [tree-base (build-tree path-base)
-          tree-other (build-tree path-other)]
-      (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
-        (compare-dir dir (dir-key tree-other))))
+    (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
+      (compare-dir dir (dir-key tree-other)))
     (print-results *compare-results*)))
 
+(defn compare-paths [path-base path-other]
+  (let [tree-base (build-tree path-base)
+        tree-other (build-tree path-other)]
+    (compare-trees tree-base tree-other)))
+
 (defn test-tree []
-  (reset! ignore-list [".git"
-                       "bin"
-                       "src\\clojure.console\\obj"
-                       "src\\clync\\obj"])
   (pp/pprint 
    (build-tree "C:\\dev\\clync")))
 
