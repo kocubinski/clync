@@ -12,7 +12,7 @@
              ["-d" "--base-dir" :default System.Environment/CurrentDirectory]
              ["-o" "--other-dir"]
              ["-r" "--remote"])
-        {:keys [base-dir remote]} (first cli-res)
+        {:keys [base-dir remote] :as args} (first cli-res)
         action (-> cli-res second first)]
     (println cli-res)
     (condp = action
@@ -20,5 +20,5 @@
                 (println "Writing tree state...")
                 (write-tree-state base-dir))
       "diff" (compare-trees (build-tree base-dir)
-                            (get-tree (keyword remote)))
+                            (get-tree args))
       (println "Invalid action:" action))))

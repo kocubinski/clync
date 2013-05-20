@@ -63,9 +63,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\lib\ClojureClrEx.dll</HintPath>
     </Reference>
-    <Reference Include="clync">
-      <HintPath>..\clync\bin\Debug\clync.dll</HintPath>
-    </Reference>
     <Reference Include="CommandLine">
       <HintPath>..\..\packages\CommandLineParser.1.9.3.29\lib\CommandLine.dll</HintPath>
     </Reference>
@@ -129,6 +126,12 @@
       <ProductName>Windows Installer 3.1</ProductName>
       <Install>true</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\clync\clync.csproj">
+      <Project>{0f1ceaba-f751-47e1-88e7-74363d2c05af}</Project>
+      <Name>clync</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />

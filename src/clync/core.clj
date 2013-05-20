@@ -2,24 +2,26 @@
   (:use [clync.cprint :only [cprint]])
   (:require [clojure.string :as str]
             [clojure.pprint :as pp]
-            [clync.remote :as remote])
+            [clync.remote :as remote]
+            [clojure.tools.logging :as log])
   (:import [System.IO Directory FileStream FileMode IOException]
            [System.Security.Cryptography SHA1CryptoServiceProvider]))
 
-(def root-path (atom nil))
-(def ignore-list (atom []))
+(def ^:dynamic *ignore-list*)
+(def ^:dynamic *root-path*)
+(def ^:dynamic *root-path-other*)
 
 (defprotocol INode)
 
-(defrecord File [hash full-path root-path]
+(defrecord File [hash full-path]
   INode)
 
-(defrecord Dir [full-path root-path children]
+(defrecord Dir [full-path children]
   INode)
 
-(defn relative-path [^INode {:keys [full-path root-path]}]
+(defn relative-path [^INode {:keys [full-path]}]
   (let [matcher (re-matcher
-                 (re-pattern (str "(" (str/replace root-path "\\" "\\\\") ")(.*)$" ))
+                 (re-pattern (str "(" (str/replace *root-path* "\\" "\\\\") ")(.*)$" ))
                  full-path)
         rel-path (last (re-find matcher))
         ;; trim leading \\
@@ -61,24 +63,23 @@
    inodes))
 
 (defn process-dir [path]
-  (let [root-path @root-path
-        dirs (Directory/GetDirectories path) 
+  (let [dirs (Directory/GetDirectories path) 
         files (Directory/GetFiles path)]
     (-> (concat
          (for [d dirs]
-           (Dir. d root-path nil))
+           (Dir. d nil))
          (for [f files]
-           (File. (sha1-hash f) f root-path)))
-        (filter-ignores @ignore-list))))
+           (File. (sha1-hash f) f)))
+        (filter-ignores *ignore-list*))))
 
-(defn process-tree [path]
-  (let [contents (process-dir path)
-        tree (map #(let [{:keys [full-path root-path]} %
+(defn process-tree [root-path]
+  (let [contents (process-dir root-path)
+        tree (map #(let [{:keys [full-path]} %
                          short-path (short-path %)]
                      (condp = (type %)
                        File [(keyword short-path) %]
                        Dir [(keyword short-path)
-                            (Dir. full-path root-path
+                            (Dir. full-path
                                   (->> (process-tree full-path)
                                        (vec)
                                        (into {})))]))
@@ -86,12 +87,14 @@
     (into {} tree)))
 
 (defn build-tree [path]
-  (reset! root-path path)
-  (reset! ignore-list [".git"
-                       "bin"
-                       "src\\clojure.console\\obj"
-                       "src\\clync\\obj"]) 
-  (process-tree path))
+  (binding [*root-path* path
+            *ignore-list* ["_ReSharper.clync"
+                           ".git"
+                           "bin"
+                           "src\\clojure.console\\obj"
+                           "src\\clync\\obj"]] 
+    {:meta {:root path}
+     :tree (process-tree path)}))
 
 (defn write-tree-state [tree-path & {:keys [config-path]}]
   (let [config-path (or config-path (str tree-path "\\.clync-tree.clj"))]
@@ -114,12 +117,14 @@
      :equal? (= (:hash file) (:hash file-other))}))
 
 (defn compare-dir [^Dir dir-base ^Dir dir-other]
+  (log/info "Comparing" dir-base "to" dir-other)
   (doseq [[node-key node] (:children dir-base)]
     (condp = (type node)
       File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
       Dir (compare-dir node (-> dir-other :children node-key)))))
 
 (defn compare-trees [tree-base tree-other]
+  (log/info "compare-trees")
   (binding [*compare-results* []]
     (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
       (compare-dir dir (dir-key tree-other)))
@@ -131,9 +136,8 @@
     (compare-trees tree-base tree-other)))
 
 (defn test-tree []
-  (pp/pprint 
-   (build-tree "C:\\dev\\clync")))
+  (pp/pprint
+   (build-tree "C:\\mski\\dev\\clync")))
 
 (defn test-website []
-  (reset! ignore-list [])
   (pp/pprint (build-tree "C:\\dev\\TotalPro\\Dev\\TotalPro_Designer")))

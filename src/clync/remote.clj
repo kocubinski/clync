@@ -28,6 +28,7 @@
       (with-open [reader (StreamReader. response)]
         (println (.ReadToEnd reader))))))
 
-(defn get-tree [remote-key]
-  (read-tree-file (read-remote remote-key)))
-
+(defn get-tree [{:keys [remote other-dir]}]
+  (if remote
+    (read-tree-file (read-remote remote))
+    (read-tree-file {:protocol :unc :uri other-dir})))
