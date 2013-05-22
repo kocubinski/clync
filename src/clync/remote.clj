@@ -12,9 +12,9 @@
 (defmulti read-tree-file :protocol)
 
 (defmethod read-tree-file :unc [{:keys [uri]}]
-  (time
-   (let [tree-file (str uri "\\.clync-tree.clj")
-         tree (slurp tree-file :enc "UTF-8")])))
+  (let [tree-file (str uri "\\.clync-tree.clj")
+        tree (slurp tree-file :enc "UTF-8")]
+    (read-string tree)))
 
 (defmethod read-tree-file :ftp  [{:keys [uri username password domain]}]
   (let [uri (Uri. (str uri "/.clync-tree.clj"))
@@ -31,4 +31,6 @@
 (defn get-tree [{:keys [remote other-dir]}]
   (if remote
     (read-tree-file (read-remote remote))
-    (read-tree-file {:protocol :unc :uri other-dir})))
+    ;; create a faux remote entry if using other-dir
+    (read-tree-file {:protocol :unc
+                     :uri other-dir})))

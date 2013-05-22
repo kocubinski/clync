@@ -5,6 +5,15 @@
         [clync.cli :only [cli]]
         [clync.remote :only [get-tree]]))
 
+(defn action [action {:keys [base-dir remote] :as args}]
+  (condp = action
+      :write (do
+                (println "Writing tree state...")
+                (write-tree-state base-dir))
+      :diff (compare-trees (build-tree base-dir)
+                           (get-tree args))
+      (println "Invalid action:" action)))
+
 (defn main [args]
   (let [cli-res
         (cli args
@@ -13,12 +22,5 @@
              ["-o" "--other-dir"]
              ["-r" "--remote"])
         {:keys [base-dir remote] :as args} (first cli-res)
-        action (-> cli-res second first)]
-    (println cli-res)
-    (condp = action
-      "write" (do
-                (println "Writing tree state...")
-                (write-tree-state base-dir))
-      "diff" (compare-trees (build-tree base-dir)
-                            (get-tree args))
-      (println "Invalid action:" action))))
+        action* (-> cli-res second first)]
+    (action (keyword action*) args)))

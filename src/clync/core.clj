@@ -21,21 +21,21 @@
 
 (defn relative-path [^INode {:keys [full-path]}]
   (let [matcher (re-matcher
-                 (re-pattern (str "(" (str/replace *root-path* "\\" "\\\\") ")(.*)$" ))
+                 (re-pattern (str "(" *root-path* ")(.*)$" ))
                  full-path)
         rel-path (last (re-find matcher))
-        ;; trim leading \\
-        rel-path (if (= \\ (first rel-path))
+        ;; trim leading / 
+        rel-path (if (= \/ (first rel-path))
                     (apply str (rest rel-path))
                     rel-path)
-        ;; trim trailing \\
-        rel-path (if (= \\ (last rel-path))
+        ;; trim trailing/ 
+        rel-path (if (= \/ (last rel-path))
                    (apply str (butlast rel-path))
                    rel-path)]
     rel-path))
 
 (defn short-path [^INode {:keys [full-path]}]
-  (last (str/split full-path #"\\")))
+  (last (str/split full-path #"/")))
 
 (defn get-keyword [node]
   (keyword (short-path node)))
@@ -63,8 +63,8 @@
    inodes))
 
 (defn process-dir [path]
-  (let [dirs (Directory/GetDirectories path) 
-        files (Directory/GetFiles path)]
+  (let [dirs (map #(.Replace % \\ \/) (Directory/GetDirectories path)) 
+        files (map #(.Replace % \\ \/) (Directory/GetFiles path))]
     (-> (concat
          (for [d dirs]
            (Dir. d nil))
@@ -91,14 +91,14 @@
             *ignore-list* ["_ReSharper.clync"
                            ".git"
                            "bin"
-                           "src\\clojure.console\\obj"
-                           "src\\clync\\obj"]] 
+                           "src/clojure.console/obj"
+                           "src/clync/obj"]] 
     {:meta {:root path}
      :tree (process-tree path)}))
 
 (defn write-tree-state [tree-path & {:keys [config-path]}]
   (let [config-path (or config-path (str tree-path "\\.clync-tree.clj"))]
-    (spit config-path (build-tree tree-path))))
+    (spit config-path (pr-str (build-tree tree-path)))))
 
 (defn read-tree-state [config-path]
   (read-string (slurp config-path)))
@@ -117,7 +117,7 @@
      :equal? (= (:hash file) (:hash file-other))}))
 
 (defn compare-dir [^Dir dir-base ^Dir dir-other]
-  (log/info "Comparing" dir-base "to" dir-other)
+  ;;(log/info "Comparing" (:full-path dir-base) "to" (:full-path dir-other))
   (doseq [[node-key node] (:children dir-base)]
     (condp = (type node)
       File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
@@ -125,9 +125,12 @@
 
 (defn compare-trees [tree-base tree-other]
   (log/info "compare-trees")
+  (log/debug "tree-base" tree-base)
+  (log/debug "tree-other" tree-other)
   (binding [*compare-results* []]
-    (doseq [[dir-key dir] (filter #(= (type (second %)) Dir) tree-base)]
-      (compare-dir dir (dir-key tree-other)))
+    (doseq [[dir-key dir] (filter #(= (type (second %)) Dir)
+                                  (:tree tree-base))]
+      (compare-dir dir (dir-key (:tree tree-other))))
     (print-results *compare-results*)))
 
 (defn compare-paths [path-base path-other]
