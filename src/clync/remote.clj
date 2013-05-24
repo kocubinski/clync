@@ -1,4 +1,5 @@
 (ns clync.remote
+  (:require [clojure.tools.logging :as log])
   (:import [System.Net WebClient NetworkCredential WebRequest WebRequestMethods+Ftp]
            [System.Security SecureString]
            [System.IO StreamReader]))
@@ -14,6 +15,7 @@
 (defmethod read-tree-file :unc [{:keys [uri]}]
   (let [tree-file (str uri "\\.clync-tree.clj")
         tree (slurp tree-file :enc "UTF-8")]
+    (log/info tree)
     (read-string tree)))
 
 (defmethod read-tree-file :ftp  [{:keys [uri username password domain]}]

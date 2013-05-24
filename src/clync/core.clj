@@ -4,8 +4,12 @@
             [clojure.pprint :as pp]
             [clync.remote :as remote]
             [clojure.tools.logging :as log])
-  (:import [System.IO Directory FileStream FileMode IOException]
-           [System.Security.Cryptography SHA1CryptoServiceProvider]))
+  (:import
+   [System.IO Directory FileStream FileMode IOException DirectoryInfo]
+   [System.Security.Cryptography SHA1CryptoServiceProvider]))
+
+;;;;;;;;;;;;;;;;;;;;
+;; structures
 
 (def ^:dynamic *ignore-list*)
 (def ^:dynamic *root-path*)
@@ -18,6 +22,9 @@
 
 (defrecord Dir [full-path children]
   INode)
+
+;;;;;;;;;;;;;;;;;;;;
+;; tree building
 
 (defn relative-path [^INode {:keys [full-path]}]
   (let [matcher (re-matcher
@@ -77,8 +84,8 @@
         tree (map #(let [{:keys [full-path]} %
                          short-path (short-path %)]
                      (condp = (type %)
-                       File [(keyword short-path) %]
-                       Dir [(keyword short-path)
+                       File [short-path %]
+                       Dir [short-path
                             (Dir. full-path
                                   (->> (process-tree full-path)
                                        (vec)
@@ -103,25 +110,41 @@
 (defn read-tree-state [config-path]
   (read-string (slurp config-path)))
 
+;;;;;;;;;;;;;;;;;;;;
+;; comparing trees
+
 (def ^:dynamic *compare-results*)
 
 (defn print-results [compare-results]
-  (pp/pprint (filter #(or (not (:in-other? %)) (not (:equal? %)))
-                     compare-results)))
+  (comment (pp/pprint (filter #(or (not (:in-other? %)) (not (:equal? %)))
+                              compare-results)))
+  (let [not-equal (filter #(not (:equal %)) compare-results)
+        not-in-other (->> compare-results
+                          (filter #(not (:in-other? %)))
+                          (map :full-path)
+                          (apply str))]
+    (cprint (color :red not-in-other))))
 
 (defn compare-file [file dir-other]
-  (let [file-key (get-keyword file)
-        file-other (-> dir-other :children file-key)]
+  (log/info "compare-file" file "against dir" dir-other)
+  (if dir-other
+    (let [short-path (short-path file)
+          file-other ((:children dir-other) short-path)]
+      {:full-path (:full-path file)
+       :in-base? true
+       :in-other? (not (nil? file-other))
+       :equal? (= (:hash file) (:hash file-other))})
     {:full-path (:full-path file)
-     :in-other? (not (nil? file-other))
-     :equal? (= (:hash file) (:hash file-other))}))
+     :in-base? true
+     :in-other? false
+     :equal? false}))
 
 (defn compare-dir [^Dir dir-base ^Dir dir-other]
   ;;(log/info "Comparing" (:full-path dir-base) "to" (:full-path dir-other))
   (doseq [[node-key node] (:children dir-base)]
     (condp = (type node)
       File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
-      Dir (compare-dir node (-> dir-other :children node-key)))))
+      Dir (compare-dir node ((:children dir-other) node-key)))))
 
 (defn compare-trees [tree-base tree-other]
   (log/info "compare-trees")
@@ -130,7 +153,7 @@
   (binding [*compare-results* []]
     (doseq [[dir-key dir] (filter #(= (type (second %)) Dir)
                                   (:tree tree-base))]
-      (compare-dir dir (dir-key (:tree tree-other))))
+      (compare-dir dir ((:tree tree-other) dir-key)))
     (print-results *compare-results*)))
 
 (defn compare-paths [path-base path-other]
@@ -138,9 +161,15 @@
         tree-other (build-tree path-other)]
     (compare-trees tree-base tree-other)))
 
+;;;;;;;;;;;;;;;;;;;;
+;; testing
+
 (defn test-tree []
   (pp/pprint
    (build-tree "C:\\mski\\dev\\clync")))
 
 (defn test-website []
   (pp/pprint (build-tree "C:\\dev\\TotalPro\\Dev\\TotalPro_Designer")))
+
+(defn test-compare []
+  (compare-paths "c:/dev/clync" "c:/dev/clync2"))

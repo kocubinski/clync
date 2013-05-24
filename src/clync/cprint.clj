@@ -41,8 +41,10 @@
 (defn cprint* [sexp]
   (loop [elems sexp]
     (when-let [elem (first elems)]
+      (println "processing" elem)
       (condp = (type elem)
         System.String (print elem "")
+        clojure.lang.Symbol ~elem
         clojure.lang.PersistentList (cprint* elem)
         nil)
       (if (= (type elem) clojure.lang.Symbol)
@@ -51,7 +53,52 @@
           (print (eval sexp) ""))
         (recur (rest elems))))))
 
+(defn color [color & rest]
+  (let [prev-color *cur-color*]
+    (set-color color)
+    (apply println rest)
+    (set-color prev-color)))
+
+
+;; (foo "bar" baz
+;;  (color :blue qux "stuff")
+;;  "final" )
+;; ->
+;; (print foo "bar" baz")
+;; (set-color :blue)
+;; (print qux "stuff")
+;; (set-color :light-gray)
+;; (print "final")
+
 (defmacro cprint [& body]
   (println body)
-  (binding [*cur-color* :light-gray]
-    (cprint* body)))
+  (comment (binding [*cur-color* :light-gray]
+             (cprint* body)))
+  ;; resolve all locals to strings
+  (comment (loop [elems body]
+             (when-let [elem (first elems)]
+               (println "processing" elem)
+               (condp = (type elem)
+                 System.String (print elem "")
+                 clojure.lang.Symbol ~elem
+                 clojure.lang.PersistentList (cprint* elem)
+                 nil)
+               (if (= (type elem) clojure.lang.Symbol)
+                 (condp = elem
+                   (symbol "color") (cprint-color sexp)
+                   (print (eval sexp) ""))
+                 (recur (rest elems))))))
+  `(do
+     ~(for [e body]
+        (condp = (type e)
+          clojure.lang.Symbol (condp = e
+                                'color )
+          System.String e
+          clojure.lang.PersistentList "list"
+          nil))))
+
+'((print foo "foo")
+  (set-color :blue)
+  (print "blue stuff")
+  (set-color :light-gray))
+

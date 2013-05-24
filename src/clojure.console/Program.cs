@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using CommandLine;
-using clojure.lang;
 using clojure.lang.Hosting;
 
 namespace clojure.console
@@ -21,6 +20,7 @@ namespace clojure.console
             cmdParser.ParseArguments(args, options);
 
             Assembly.Load("clync");
+            Assembly.Load("ClojureClrEx");
             Clojure.AddNamespaceLoadMapping("clync", @"src\clync");
 
             const string replInit = "(use 'clync.init)\n" +
