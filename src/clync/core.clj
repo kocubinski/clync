@@ -5,7 +5,7 @@
             [clync.remote :as remote]
             [clojure.tools.logging :as log])
   (:import
-   [System.IO Directory FileStream FileMode IOException DirectoryInfo]
+   [System.IO Directory FileStream FileMode IOException DirectoryInfo FileAccess]
    [System.Security.Cryptography SHA1CryptoServiceProvider]))
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -54,12 +54,12 @@
     (. str-hash ToString)))
 
 (defn sha1-hash [path]
-  (log/debug "Calculating hash for" path)
+  (println "Processing" path "...")
   (try 
-    (with-open [fs (FileStream. path FileMode/Open)]
+    (with-open [fs (FileStream. path FileMode/Open FileAccess/Read)]
       (-> (.ComputeHash (SHA1CryptoServiceProvider.) fs)
           (hash->string)))
-    (catch IOException e
+    (catch Exception e
       (println "WARN:" (. e Message)))))
 
 (defn filter-ignores [inodes ignore-list]
@@ -104,9 +104,10 @@
     {:meta {:root path}
      :tree (process-tree path)}))
 
-(defn write-tree-state [tree-path & {:keys [config-path]}]
-  (let [config-path (or config-path (str tree-path "\\.clync-tree.clj"))]
-    (spit config-path (pr-str (build-tree tree-path)))))
+(defn write-tree-state [tree-path & {:keys [config ignore]}]
+  (binding [*ignore-list* ignore]
+    (let [config-path (or config (str tree-path "\\.clync-tree.clj"))]
+      (spit config-path (pr-str (build-tree tree-path))))))
 
 (defn read-tree-state [config-path]
   (read-string (slurp config-path)))

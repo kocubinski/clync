@@ -5,12 +5,10 @@
            [System.IO StreamReader]))
 
 (defn read-remote
-  [remote-key & {:keys [remotes-config]
-             :or {remotes-config
+  [remote-key & {:keys [config]
+             :or {config
                   (str System.Environment/CurrentDirectory "\\.clync-config.clj")}}]
-  (log/debug "trying to read remote" remote-key "from" remotes-config)
-  (let [config (read-string (slurp remotes-config :encoding "UTF-8"))]
-    (log/debug "read:" config)
+  (let [config (read-string (slurp config :encoding "UTF-8"))]
     (-> config :remotes remote-key)))
 
 (defmulti read-tree-file :protocol)
