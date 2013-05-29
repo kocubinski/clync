@@ -1,5 +1,5 @@
 (ns clync.core
-  (:use [clync.cprint :only [cprint]])
+  (:use [clync.cprint :only [set-color]])
   (:require [clojure.string :as str]
             [clojure.pprint :as pp]
             [clync.remote :as remote]
@@ -54,6 +54,7 @@
     (. str-hash ToString)))
 
 (defn sha1-hash [path]
+  (log/debug "Calculating hash for" path)
   (try 
     (with-open [fs (FileStream. path FileMode/Open)]
       (-> (.ComputeHash (SHA1CryptoServiceProvider.) fs)
@@ -118,12 +119,19 @@
 (defn print-results [compare-results]
   (comment (pp/pprint (filter #(or (not (:in-other? %)) (not (:equal? %)))
                               compare-results)))
-  (let [not-equal (filter #(not (:equal %)) compare-results)
-        not-in-other (->> compare-results
-                          (filter #(not (:in-other? %)))
-                          (map :full-path)
-                          (apply str))]
-    (cprint (color :red not-in-other))))
+  (let [not-equal (filter #(not (:equal? %)) compare-results)
+        not-in-other (filter #(not (:in-other? %)) compare-results)]
+    (println)
+    (set-color :white)
+    (println (count not-equal) "file(s) not equal.")
+    (set-color :bright-red)
+    (pp/pprint (map :full-path not-equal))
+    (println)
+    (set-color :white)
+    (println (count not-in-other) "file(s) not in other tree.")
+    (set-color :green)
+    (pp/pprint (map :full-path not-in-other))
+    (set-color :light-gray)))
 
 (defn compare-file [file dir-other]
   (log/info "compare-file" file "against dir" dir-other)
@@ -146,10 +154,15 @@
       File (set!  *compare-results* (conj *compare-results* (compare-file node dir-other)))
       Dir (compare-dir node ((:children dir-other) node-key)))))
 
+(defn str-pprint [data]
+  (let [w (System.IO.StringWriter.)]
+    (pp/pprint data w)
+    (.ToString w)))
+
 (defn compare-trees [tree-base tree-other]
   (log/info "compare-trees")
-  (log/debug "tree-base" tree-base)
-  (log/debug "tree-other" tree-other)
+  (log/debug "tree-base" (str-pprint tree-base))
+  (log/debug "tree-other" (str-pprint tree-other))
   (binding [*compare-results* []]
     (doseq [[dir-key dir] (filter #(= (type (second %)) Dir)
                                   (:tree tree-base))]

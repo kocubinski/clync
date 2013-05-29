@@ -8,7 +8,10 @@
   [remote-key & {:keys [remotes-config]
              :or {remotes-config
                   (str System.Environment/CurrentDirectory "\\.clync-config.clj")}}]
-  (-> (read-string (slurp remotes-config :encoding "UTF-8")) :remotes remote-key))
+  (log/debug "trying to read remote" remote-key "from" remotes-config)
+  (let [config (read-string (slurp remotes-config :encoding "UTF-8"))]
+    (log/debug "read:" config)
+    (-> config :remotes remote-key)))
 
 (defmulti read-tree-file :protocol)
 
@@ -32,7 +35,7 @@
 
 (defn get-tree [{:keys [remote other-dir]}]
   (if remote
-    (read-tree-file (read-remote remote))
+    (read-tree-file (read-remote (keyword remote)))
     ;; create a faux remote entry if using other-dir
     (read-tree-file {:protocol :unc
                      :uri other-dir})))
